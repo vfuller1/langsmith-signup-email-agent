@@ -1,0 +1,7 @@
+langchain
+langchain_openai
+langchain_core
+langsmith
+deepeval
+pandas
+python-dotenv
