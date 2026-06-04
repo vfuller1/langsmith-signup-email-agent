@@ -2,6 +2,8 @@
 
 A LangChain agent that processes new user signups, classifies ICP fit, and generates personalized welcome emails — with full LangSmith tracing, a golden eval dataset, and a custom LLM-as-a-Judge scoring pipeline.
 
+![End to end overview](images/Email%20Agent%20Eval%20end%20to%20end.jpg)
+
 ## 💡 Use Cases
 
 This agent is a template for any SaaS product that wants to **automatically qualify and engage new signups** without manual effort. Real-world applications include:
@@ -40,33 +42,9 @@ langsmith-signup-email-agent/
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                      agent.py                           │
-│                                                         │
-│  ┌─────────────┐    ┌──────────────┐   ┌────────────┐  │
-│  │  Signup     │───▶│   _Agent     │──▶│ LangSmith  │  │
-│  │  Input      │    │  (LLM Chain) │   │  Tracing   │  │
-│  └─────────────┘    └──────┬───────┘   └────────────┘  │
-│                            │                            │
-│                     ┌──────▼───────┐                    │
-│                     │  Structured  │                    │
-│                     │   Output     │                    │
-│                     │  (Pydantic)  │                    │
-│                     └──────┬───────┘                    │
-│                            │                            │
-│          ┌─────────────────┼──────────────────┐         │
-│          ▼                 ▼                  ▼         │
-│       icp_fit           subject             body        │
-│   (high/med/low/       (role-           (personalized   │
-│      unknown)          specific)           email)       │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │       LLM-as-a-Judge: Personalization Quality    │   │
-│  │   Score: 0 (fail) | 1 (pass) | n/a (no data)    │   │
-│  └──────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-```
+![Multi-Model Judge Architecture](images/Multi-Model%20Judge%20Architechture.png)
+
+User data streams in → the Agent Orchestrator (LLM Chain) processes it through a Pydantic structured output definition → results are captured for LangSmith tracing → a second LLM-as-a-Judge call scores personalization quality (0 / 1 / n/a) in real time.
 
 ---
 
@@ -135,9 +113,9 @@ Total: 5/5 (excluding n/a cases)
 ### 1. ICP Classification
 **ICP** stands for **Ideal Customer Profile** — a description of the type of company or person most likely to get value from your product and become a long-term customer. In a SaaS context, ICP fit is used to prioritize sales and marketing effort: high-fit signups get white-glove outreach, low-fit signups get a lighter touch.
 
-This agent scores each signup against Glop's ICP at the time of signup, so the welcome email can be tailored accordingly — before any human ever looks at the lead.
+Raw webhook JSON is first passed through a Pydantic model that validates, capitalizes, and maps fields into a clean structured format before classification runs:
 
-The agent classifies each signup into one of four tiers:
+![Data Payload Transformation](images/Data%20Payload%20Transformation.png)
 
 | Tier | Criteria |
 |------|----------|
@@ -153,42 +131,126 @@ Emails are generated with ICP-tier-specific value props:
 - **Low** → warm, simple, no jargon — always uses first name if provided
 - **Unknown** → generic and inviting
 
+### 3. LLM-as-a-Judge
+After each email is generated, a second LLM call scores personalization quality. The judge sits between the primary LLM and the production trace monitor, scoring every output before it lands in LangSmith:
+
+![Multi-Model LLM-as-a-Judge Flow](images/Multi-Model%20LLM-as-a-Judge%20Flow.png)
+
+```
+Score 1   → name used + role/company referenced + context-specific value prop
+Score 0   → generic greeting when name available, or role/company ignored
+Score n/a → no personalizable data existed in the input (not a failure)
+```
+
 ---
 
 ## 🧪 Evaluation Strategy: Online vs Offline
 
 This project implements both types of eval that matter in production AI systems.
 
-### Online Eval (runs in `agent.py`, on every invocation)
+### Offline Eval — runs in `agent.py` against the golden dataset
 
-**What it is:** After the agent generates each email, a second LLM call immediately scores it for personalization quality — scoring 1 (pass), 0 (fail), or n/a (no data to personalize against).
+**What it is:** A batch evaluation that runs the agent against all 6 golden dataset test cases and scores each output with a custom `judge_personalization()` function — an LLM call that returns 1 (pass), 0 (fail), or n/a.
 
-**Purpose:** Catch quality regressions in real time. In a production system this would run on every real signup, with scores sent to LangSmith so you can monitor trends over time — e.g. "did this prompt change cause more 0s in the last 24 hours?"
+**Purpose:** Give you a reproducible, before/after comparison when you change the prompt. These are essentially unit/integration tests for your agent — run them before every deployment to catch regressions.
 
-```
-Score 1  → name used + role/company referenced + context-specific value prop
-Score 0  → generic greeting when name available, or role/company ignored
-Score n/a → no personalizable data existed in the input (not a failure)
-```
+The golden dataset lives in LangSmith and contains all 6 test cases with their reference outputs:
 
-### Offline Eval (runs in `eval.py`, before shipping a prompt change)
+![LangSmith Golden Dataset](images/LangSmith%20golden-dataset.png)
 
-**What it is:** A batch evaluation that pulls the full golden dataset from LangSmith, reruns the agent on every example, and scores results with two [DeepEval](https://github.com/confident-ai/deepeval) metrics:
-- `ExactMatchMetric` — checks that `icp_fit` classification exactly matches the expected label
-- `GEval` — an LLM judge that scores email quality holistically (personalization, conciseness, no hallucination)
+**Result: 5/5 ✅** (1 n/a excluded)
 
-**Purpose:** Give you a reproducible, before/after comparison when you change the prompt. You run this locally, see whether your scores went up or down across the whole dataset, and only ship if they improved (or at least didn't regress).
+### Online Eval — runs automatically in LangSmith on every agent invocation
+
+**What it is:** A LangSmith Online Evaluator (`personalization_quality`) configured to run on traces from the `langsmith-signup-email-agent` project. After every agent run, LangSmith automatically scores the output and attaches a `true/false` feedback tag to the trace.
+
+**Sampling rate:** Set to 100% for development. In production, **10% is recommended** — this gives statistically significant quality metrics without paying for an evaluator LLM call on every single user interaction.
+
+**LangSmith configuration:**
+- **Evaluator:** OnlineEval → `personalization_quality`
+- **Feedback key:** `personalization_quality` (Boolean)
+- **Sampling rate:** 100% (dev) → 10% (production recommended)
+- **Source:** `langsmith-signup-email-agent` project, all Runs
+
+Two evaluators are configured in LangSmith — one for online production monitoring (`personalization_quality`) and one for prompt injection detection:
+
+![LangSmith Evaluators](images/LangSmith%20evaluators.png)
+
+The full telemetry flow — from the production webhook through LangSmith's sampling controller to the automated quality evaluator:
+
+![LangSmith Telemetry Capture](images/The%20LangSmith%20Telemetry%20Capture.png)
 
 ### Why you need both
 
-| | Online | Offline |
+| | Offline (agent.py) | Online (LangSmith) |
 |---|---|---|
-| **When it runs** | Every live invocation | Before shipping a change |
-| **What it catches** | Production drift, live regressions | Prompt changes that hurt quality |
-| **Output** | Per-run score in LangSmith traces | Aggregate pass rate across dataset |
-| **File** | `agent.py` (`judge_personalization`) | `eval.py` |
+| **When it runs** | Manually, before shipping a change | Automatically on every invocation |
+| **What it catches** | Prompt regressions before they ship | Production drift and live failures |
+| **Output** | Aggregate pass rate in terminal | Per-run score in LangSmith traces |
+| **Best for** | Iterating on the prompt confidently | Monitoring quality over time |
 
-Online eval tells you if things break in production. Offline eval tells you if your changes made things better or worse before you ship. You need both — one without the other leaves you either flying blind in prod, or unable to iterate confidently on your prompt.
+Offline eval tells you if your changes made things better or worse before you ship. Online eval tells you if things break in production. You need both.
+
+---
+
+## 🔄 The Continuous Improvement Loop
+
+```
+01 DEVELOPMENT
+   Run offline evals in agent.py against the golden dataset
+        ↓
+02 DEPLOYMENT
+   Deploy agent (e.g. webhook, Cloud Run, API)
+        ↓
+03 MONITORING
+   LangSmith Online Evaluator scores live traces automatically
+   Recommended sampling rate: 10% in production
+        ↓
+04 REFINEMENT
+   Export production failures → add to golden dataset
+   Fix prompt → re-run offline evals → confirm improvement
+        ↓ (loop)
+```
+
+**Key insight:** Errors identified in production traces should be exported back into the golden dataset. This creates a feedback loop where your offline test suite gets stronger every time something breaks in prod.
+
+---
+
+## 🛠️ Troubleshooting
+
+### LangSmith 403 Forbidden
+The API key is not set in the current terminal session. Fix:
+```powershell
+$env:LANGSMITH_API_KEY="your_key_here"
+python agent.py
+```
+
+### KeyError in LangSmith Evaluator
+A common error where the evaluator expects a specific JSON key (e.g. `outputs_one`) that doesn't match the actual trace structure. Fix: open a failing trace in LangSmith, inspect the raw JSON output, and verify the top-level key names match what your evaluator prompt references via `{{output}}`.
+
+### Simulating Failures to Test the Feedback Loop
+Two reliable ways to generate failures for testing:
+- **Prompt degradation** — temporarily weaken the system prompt (e.g. remove the name/role instructions) to produce generic emails that score 0
+- **Data edge cases** — introduce malformed inputs (missing name, generic domain, incomplete context) into the test set — these are already covered in the golden dataset
+
+### Dataset Count Mismatch
+If your local example count doesn't match what LangSmith shows, this is likely a caching or sync issue. Refresh the LangSmith dataset page and re-run to force a fresh fetch.
+
+---
+
+## 🌐 Framework Compatibility
+
+This project uses **LangChain + LangSmith**, which are tightly coupled and the recommended pairing for LangChain-based agents.
+
+For teams using other frameworks:
+
+| Framework | Observability | Offline Eval |
+|-----------|--------------|--------------|
+| LangChain | LangSmith (native) | `judge_personalization()` in agent.py |
+| Google ADK | OpenTelemetry | DeepEval (native ADK integration) |
+| Custom agents | LangSmith or LangFuse via OpenTelemetry | DeepEval |
+
+**Recommendation:** Choose an observability platform that actively tracks the release cycle of your underlying framework. For LangChain users, LangSmith is the natural choice.
 
 ---
 
@@ -221,31 +283,13 @@ Online eval tells you if things break in production. Offline eval tells you if y
 
 ---
 
-## 🔄 The Production Feedback Loop
-
-```
-Agent runs on new signups
-        ↓
-LangSmith traces every run (inputs, outputs, latency, cost)
-        ↓
-LLM-as-a-Judge scores personalization quality
-        ↓
-Failures identified → added to golden dataset
-        ↓
-Prompt improved → agent re-run
-        ↓
-Before/after comparison confirms improvement
-        ↓ (loop)
-```
-
----
-
 ## 📏 Evaluation Metrics
 
 | Metric | Type | Tool | Result |
 |--------|------|------|--------|
 | ICP fit classification | Structured output | Pydantic + GPT-4o-mini | ✅ All cases correct |
-| Personalization quality | LLM-as-a-Judge (0/1/n/a) | Custom judge | 5/5 ✅ |
+| Personalization quality (offline) | LLM-as-a-Judge (0/1/n/a) | `judge_personalization()` in agent.py | 5/5 ✅ |
+| Personalization quality (online) | Boolean (true/false) | LangSmith OnlineEval | ✅ Active, 100% sampling |
 | Tracing & observability | Online traces | LangSmith | ✅ Active |
 
 ---
@@ -257,7 +301,9 @@ This project implements the **continuous improvement loop** for AI agents:
 1. **Baseline** — ran the agent, reviewed traces in LangSmith
 2. **Prompt improvement** — added ICP-tier-specific guidance, tighter word limit, required CTA
 3. **Golden dataset** — 6 test cases covering happy path and real-world edge cases
-4. **LLM-as-a-Judge** — automated scoring for personalization quality (0/1/n/a)
-5. **Iteration** — fixed low ICP fallback, added n/a handling for incomplete context
+4. **LLM-as-a-Judge (offline)** — automated scoring in `agent.py` for personalization quality (0/1/n/a)
+5. **Online Evaluator** — configured LangSmith to score every live run automatically
+6. **Iteration** — fixed low ICP fallback, added n/a handling for incomplete context
 
-**Key insight:** Without evals, you're guessing whether your prompt got better. With a golden dataset and a judge, you have a repeatable, objective measure of improvement.
+**Key insight:** Without evals, you're guessing whether your prompt got better. With a golden dataset for offline testing and an online evaluator for production monitoring, you have a repeatable, objective measure of improvement at every stage. Failures in production become new test cases — making the system smarter over time.
+
