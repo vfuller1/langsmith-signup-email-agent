@@ -148,7 +148,15 @@ Score n/a → no personalizable data existed in the input (not a failure)
 
 This project implements both types of eval that matter in production AI systems.
 
-### Offline Eval — runs in `agent.py` against the golden dataset
+### Offline Eval — run manually before shipping a prompt change
+
+```powershell
+# Option 1: agent.py golden dataset (custom LLM judge, runs locally)
+python agent.py
+
+# Option 2: eval.py DeepEval suite (pulls from LangSmith dataset, uses DeepEval metrics)
+python eval.py
+```
 
 **What it is:** A batch evaluation that runs the agent against all 6 golden dataset test cases and scores each output with a custom `judge_personalization()` function — an LLM call that returns 1 (pass), 0 (fail), or n/a.
 
@@ -160,7 +168,14 @@ The golden dataset lives in LangSmith and contains all 6 test cases with their r
 
 **Result: 5/5 ✅** (1 n/a excluded)
 
-### Online Eval — runs automatically in LangSmith on every agent invocation
+### Online Eval — no command needed, runs automatically
+
+```
+# Nothing to run — just invoke the agent normally and LangSmith scores it automatically.
+python agent.py          # or any production invocation (webhook, API call, etc.)
+```
+
+Results appear in the **LangSmith dashboard** under your project's traces — not in the terminal.
 
 **What it is:** A LangSmith Online Evaluator (`personalization_quality`) configured to run on traces from the `langsmith-signup-email-agent` project. After every agent run, LangSmith automatically scores the output and attaches a `true/false` feedback tag to the trace.
 
