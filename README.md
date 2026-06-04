@@ -153,14 +153,42 @@ Emails are generated with ICP-tier-specific value props:
 - **Low** → warm, simple, no jargon — always uses first name if provided
 - **Unknown** → generic and inviting
 
-### 3. LLM-as-a-Judge
-After each email is generated, a second LLM call scores personalization quality:
+---
+
+## 🧪 Evaluation Strategy: Online vs Offline
+
+This project implements both types of eval that matter in production AI systems.
+
+### Online Eval (runs in `agent.py`, on every invocation)
+
+**What it is:** After the agent generates each email, a second LLM call immediately scores it for personalization quality — scoring 1 (pass), 0 (fail), or n/a (no data to personalize against).
+
+**Purpose:** Catch quality regressions in real time. In a production system this would run on every real signup, with scores sent to LangSmith so you can monitor trends over time — e.g. "did this prompt change cause more 0s in the last 24 hours?"
 
 ```
 Score 1  → name used + role/company referenced + context-specific value prop
 Score 0  → generic greeting when name available, or role/company ignored
-Score n/a → no personalizable data existed in the input
+Score n/a → no personalizable data existed in the input (not a failure)
 ```
+
+### Offline Eval (runs in `eval.py`, before shipping a prompt change)
+
+**What it is:** A batch evaluation that pulls the full golden dataset from LangSmith, reruns the agent on every example, and scores results with two [DeepEval](https://github.com/confident-ai/deepeval) metrics:
+- `ExactMatchMetric` — checks that `icp_fit` classification exactly matches the expected label
+- `GEval` — an LLM judge that scores email quality holistically (personalization, conciseness, no hallucination)
+
+**Purpose:** Give you a reproducible, before/after comparison when you change the prompt. You run this locally, see whether your scores went up or down across the whole dataset, and only ship if they improved (or at least didn't regress).
+
+### Why you need both
+
+| | Online | Offline |
+|---|---|---|
+| **When it runs** | Every live invocation | Before shipping a change |
+| **What it catches** | Production drift, live regressions | Prompt changes that hurt quality |
+| **Output** | Per-run score in LangSmith traces | Aggregate pass rate across dataset |
+| **File** | `agent.py` (`judge_personalization`) | `eval.py` |
+
+Online eval tells you if things break in production. Offline eval tells you if your changes made things better or worse before you ship. You need both — one without the other leaves you either flying blind in prod, or unable to iterate confidently on your prompt.
 
 ---
 
