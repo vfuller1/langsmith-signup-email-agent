@@ -17,6 +17,19 @@ Swap out the Glop branding and ICP criteria for your own product, and this pipel
 
 ---
 
+## ⚠️ The Problem With Shipping AI Without Evals
+
+Most AI agents get shipped with vibes-based quality control. You run it a few times, it looks good, you push to prod. Then three weeks later someone notices the emails sound generic, the classifications are wrong, and nobody knows when it broke.
+
+"Simple" agents still fail in subtle ways:
+- A VP of Engineering gets a generic "leverage our tools" email
+- A user with no first name gets "Hi ,"
+- A CEO at an 8-person startup gets classified the same as a developer at a 500-person company
+
+These aren't crashes. They're quality failures — and without an eval pipeline, you'll never know they're happening. This project shows how to build the eval layer that catches them.
+
+---
+
 **Stack:** LangChain · LangSmith · OpenAI gpt-4o-mini · Python 3.10+
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
@@ -231,6 +244,36 @@ Offline eval tells you if your changes made things better or worse before you sh
 
 ---
 
+## 🛡️ Safety Evaluators
+
+Beyond quality, three additional online evaluators run automatically in LangSmith:
+
+| Evaluator | What it flags | Response |
+|-----------|--------------|----------|
+| **PII Leakage** | Sensitive personal data appearing in agent input | Routes trace to human review queue via LangSmith Automation |
+| **Prompt Injection** | Attempts to hijack the agent via malicious input | Flags trace with `prompt_injection: true` |
+| **Code Injection** | Code-based attack patterns in input | Flags trace with `code_injection: true` |
+
+When `pii_leakage: true` fires, the trace automatically routes to a human review queue — no manual monitoring required.
+
+Safety and quality are separate concerns. Build separate evaluators for each; don't combine them into one judge.
+
+---
+
+## 💡 Key Takeaways
+
+1. **Evals aren't optional for production AI.** Without them, you're flying blind — no way to know if your agent is getting better or worse as you iterate.
+
+2. **Start with a golden dataset.** Even 5–6 examples covering your known edge cases catches most regressions. Add to it every time something breaks in prod.
+
+3. **Online + offline evals serve different purposes.** Offline tells you if your changes made things better before you ship. Online tells you if things break after you ship. You need both.
+
+4. **LLM-as-a-Judge beats exact match.** Reference outputs get stale. A well-prompted judge that evaluates against clear criteria is more robust and easier to maintain.
+
+5. **Safety and quality are separate concerns.** Build separate evaluators for each — don't try to combine them into one judge.
+
+---
+
 ## 🛠️ Troubleshooting
 
 ### LangSmith 403 Forbidden
@@ -294,7 +337,7 @@ For teams using other frameworks:
 | **CTA** | "Feel free to reach out" | "Explore your dashboard to get started" |
 | **Word limit** | 150 words | 120 words |
 | **Low ICP fallback** | Dropped name | Always uses first name if provided |
-| **Eval score** | Not measured | 5/5 ✅ |
+| **Eval score** | 4/6 (before prompt fix) | 5/5 ✅ |
 
 ---
 
@@ -303,22 +346,19 @@ For teams using other frameworks:
 | Metric | Type | Tool | Result |
 |--------|------|------|--------|
 | ICP fit classification | Structured output | Pydantic + GPT-4o-mini | ✅ All cases correct |
+| ICP fit quality | GEval LLM judge | DeepEval + GPT-4o-mini | 0.78 avg ✅ |
 | Personalization quality (offline) | LLM-as-a-Judge (0/1/n/a) | `judge_personalization()` in agent.py | 5/5 ✅ |
+| Email quality | GEval LLM judge | DeepEval + GPT-4o-mini | 0.73 avg ✅ |
 | Personalization quality (online) | Boolean (true/false) | LangSmith OnlineEval | ✅ Active, 100% sampling |
+| PII leakage detection | Online evaluator | LangSmith | ✅ Active |
+| Prompt injection detection | Online evaluator | LangSmith | ✅ Active |
 | Tracing & observability | Online traces | LangSmith | ✅ Active |
 
 ---
 
-## 📝 Reflection
+## 🔗 Get the Code
 
-This project implements the **continuous improvement loop** for AI agents:
+The full project is open source. If you're building AI agents and haven't thought about evals yet, this is a good place to start.
 
-1. **Baseline** — ran the agent, reviewed traces in LangSmith
-2. **Prompt improvement** — added ICP-tier-specific guidance, tighter word limit, required CTA
-3. **Golden dataset** — 6 test cases covering happy path and real-world edge cases
-4. **LLM-as-a-Judge (offline)** — automated scoring in `agent.py` for personalization quality (0/1/n/a)
-5. **Online Evaluator** — configured LangSmith to score every live run automatically
-6. **Iteration** — fixed low ICP fallback, added n/a handling for incomplete context
-
-**Key insight:** Without evals, you're guessing whether your prompt got better. With a golden dataset for offline testing and an online evaluator for production monitoring, you have a repeatable, objective measure of improvement at every stage. Failures in production become new test cases — making the system smarter over time.
+👉 [github.com/vfuller1/langsmith-signup-email-agent](https://github.com/vfuller1/langsmith-signup-email-agent)
 
