@@ -2,7 +2,7 @@
 
 A LangChain agent that processes new user signups, classifies ICP fit, and generates personalized welcome emails — with full LangSmith tracing, a golden eval dataset, and a custom LLM-as-a-Judge scoring pipeline.
 
-![End to end overview](images/Email%20Agent%20Eval%20end%20to%20end.jpg)
+![End to end overview](images/Email%20Agent%20Eval%20end%20to%20end.png)
 
 ## 💡 Use Cases
 
@@ -30,10 +30,11 @@ These aren't crashes. They're quality failures — and without an eval pipeline,
 
 ---
 
-**Stack:** LangChain · LangSmith · OpenAI gpt-4o-mini · Python 3.10+
+**Stack:** LangChain · LangGraph · LangSmith · DeepEval · OpenAI gpt-4o-mini · Python 3.10+
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
-![LangChain](https://img.shields.io/badge/LangChain-0.3+-green?logo=chainlink&logoColor=white)
+![LangChain](https://img.shields.io/badge/LangChain-1.x-green?logo=chainlink&logoColor=white)
+![LangGraph](https://img.shields.io/badge/LangGraph-1.x-teal?logo=langchain&logoColor=white)
 ![LangSmith](https://img.shields.io/badge/LangSmith-Tracing-orange?logo=langchain&logoColor=white)
 ![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o--mini-purple?logo=openai&logoColor=white)
 
@@ -50,6 +51,7 @@ langsmith-signup-email-agent/
 ├── eval.py           # DeepEval suite against the LangSmith dataset
 ├── graph_eval.py     # LangSmith experiment: graph_agent.py vs the
 │                     # same golden dataset
+├── images/           # README diagrams and LangSmith screenshots
 ├── requirements.txt
 ├── .env.example      # Copy to .env and fill in keys
 ├── .env              # Your real keys — git-ignored
@@ -60,9 +62,9 @@ langsmith-signup-email-agent/
 
 ## 🏗️ Architecture
 
-![Multi-Model Judge Architecture](images/Multi-Model%20Judge%20Architechture.png)
+![Agent Architecture](images/Agent%20Architecture.png)
 
-User data streams in → the Agent Orchestrator (LLM Chain) processes it through a Pydantic structured output definition → results are captured for LangSmith tracing → a second LLM-as-a-Judge call scores personalization quality (0 / 1 / n/a) in real time.
+Each signup goes through two LLM calls. The agent call classifies ICP fit and writes the email, returned as a Pydantic structured output (`SignupEmailOutput`). A separate LLM-as-a-Judge call then scores personalization (0 / 1 / n/a). LangSmith traces both calls.
 
 ---
 
@@ -92,8 +94,7 @@ LANGCHAIN_PROJECT=langsmith-signup-email-agent
 
 **Run the agent + full eval suite**
 ```bash
-# Set your LangSmith key in the session first (Windows PowerShell)
-$env:LANGSMITH_API_KEY="your_key_here"
+# Keys are loaded from .env automatically
 python agent.py
 ```
 
@@ -131,9 +132,9 @@ Total: 5/5 (excluding n/a cases)
 ### 1. ICP Classification
 **ICP** stands for **Ideal Customer Profile** — a description of the type of company or person most likely to get value from your product and become a long-term customer. In a SaaS context, ICP fit is used to prioritize sales and marketing effort: high-fit signups get white-glove outreach, low-fit signups get a lighter touch.
 
-Raw webhook JSON is first passed through a Pydantic model that validates, capitalizes, and maps fields into a clean structured format before classification runs:
+The signup is sent to the model as plain `key: value` text. There's no input model, so the edge cases (missing name, email only) reach the model as they are. Pydantic is used on the **output**: `SignupEmailOutput` limits `icp_fit` to the four tiers below and returns `to`, `reason`, `subject` and `body` as a validated object:
 
-![Data Payload Transformation](images/Data%20Payload%20Transformation.png)
+![Structured Output Schema](images/Structured%20Output%20Schema.png)
 
 | Tier | Criteria |
 |------|----------|
@@ -150,9 +151,9 @@ Emails are generated with ICP-tier-specific value props:
 - **Unknown** → generic and inviting
 
 ### 3. LLM-as-a-Judge
-After each email is generated, a second LLM call scores personalization quality. The judge sits between the primary LLM and the production trace monitor, scoring every output before it lands in LangSmith:
+After each email is generated, a second LLM call (`judge_personalization()`) scores personalization quality. It sees only the signup and the email body, and scores against fixed rules rather than a stored reference answer. In `graph_agent.py`, the same judge decides whether a draft gets one rewrite:
 
-![Multi-Model LLM-as-a-Judge Flow](images/Multi-Model%20LLM-as-a-Judge%20Flow.png)
+![LLM-as-a-Judge Flow](images/LLM-as-a-Judge%20Flow.png)
 
 ```
 Score 1   → name used + role/company referenced + context-specific value prop
@@ -174,9 +175,12 @@ python agent.py
 
 # Option 2: eval.py DeepEval suite (pulls from LangSmith dataset, uses DeepEval metrics)
 python eval.py
+
+# Option 3: graph_eval.py — the LangGraph version, recorded as a LangSmith experiment
+python graph_eval.py
 ```
 
-**What it is:** A batch evaluation that runs the agent against all 6 golden dataset test cases and scores each output with a custom `judge_personalization()` function — an LLM call that returns 1 (pass), 0 (fail), or n/a.
+**What it is:** Batch evaluations against the 6 golden test cases. `agent.py` scores each email with the custom `judge_personalization()` (1 pass, 0 fail, or n/a). `eval.py` pulls the dataset from LangSmith and scores ICP fit and email quality with DeepEval GEval metrics. `graph_eval.py` is covered in the [LangGraph section](#offline-eval-for-the-graph).
 
 **Purpose:** Give you a reproducible, before/after comparison when you change the prompt. These are essentially unit/integration tests for your agent — run them before every deployment to catch regressions.
 
@@ -197,7 +201,9 @@ Results appear in the **LangSmith dashboard** under your project's traces — no
 
 **What it is:** A LangSmith Online Evaluator (`personalization_quality`) configured to run on traces from the `langsmith-signup-email-agent` project. After every agent run, LangSmith automatically scores the output and attaches a `true/false` feedback tag to the trace.
 
-**Sampling rate:** Set to 100% for development. In production, **10% is recommended** — this gives statistically significant quality metrics without paying for an evaluator LLM call on every single user interaction.
+**Sampling rate:** Set to 100% for development. In production, **10% is recommended** — this gives statistically significant quality metrics without paying for an evaluator LLM call on every single user interaction. Evaluators are LLM calls too: in the week of Oct 19–25, 2026, the four evaluators cost $4.83 across 406 runs, while the agent itself cost $0.01.
+
+**Known gap:** in `agent.py`, the agent call and the judge call are each their own root trace, so the online evaluator also scores the judge's calls. In production, filter the rule to agent runs only.
 
 **LangSmith configuration:**
 - **Evaluator:** OnlineEval → `personalization_quality`
@@ -209,9 +215,9 @@ Four LLM-as-a-Judge evaluators run on the project's traces in LangSmith — `per
 
 ![LangSmith Evaluators](images/LangSmith%20evaluators.png)
 
-The full telemetry flow — from the production webhook through LangSmith's sampling controller to the automated quality evaluator:
+How traces flow from the scripts into LangSmith, through the evaluators, and back into the golden dataset:
 
-![LangSmith Telemetry Capture](images/The%20LangSmith%20Telemetry%20Capture.png)
+![LangSmith Telemetry](images/LangSmith%20Telemetry.png)
 
 ### Why you need both
 
@@ -259,7 +265,7 @@ Beyond quality, three additional online evaluators run automatically in LangSmit
 | **Prompt Injection** | Attempts to hijack the agent via malicious input | Flags trace with `prompt_injection: true` |
 | **Code Injection** | Code-based attack patterns in input | Flags trace with `code_injection: true` |
 
-When `pii_leakage: true` fires, the trace automatically routes to a human review queue — no manual monitoring required.
+When `pii_leakage: true` fires, a LangSmith automation rule (PII Alert) routes the trace to `pii-review-queue` — no manual monitoring required. Because every signup contains a name and an email, `pii_leakage` currently flags most traces; in production you'd tune it to flag only unexpected PII.
 
 Safety and quality are separate concerns. Build separate evaluators for each; don't combine them into one judge.
 
@@ -349,9 +355,9 @@ First result: ICP fit 6/6, personalization 5/5, revisions 0/6, paused 6/6.
 ## 🛠️ Troubleshooting
 
 ### LangSmith 403 Forbidden
-The API key is not set in the current terminal session. Fix:
+Check `LANGSMITH_API_KEY` in `.env`. A key set in your terminal takes priority over `.env` (`load_dotenv()` doesn't override existing variables), so clear an old one:
 ```powershell
-$env:LANGSMITH_API_KEY="your_key_here"
+Remove-Item Env:LANGSMITH_API_KEY
 python agent.py
 ```
 
@@ -418,12 +424,14 @@ For teams using other frameworks:
 | Metric | Type | Tool | Result |
 |--------|------|------|--------|
 | ICP fit classification | Structured output | Pydantic + GPT-4o-mini | ✅ All cases correct |
-| ICP fit quality | GEval LLM judge | DeepEval + GPT-4o-mini | 0.78 avg ✅ |
+| ICP fit quality | GEval LLM judge | DeepEval + GPT-4o-mini | 0.78–0.80 avg ✅ (varies per run) |
 | Personalization quality (offline) | LLM-as-a-Judge (0/1/n/a) | `judge_personalization()` in agent.py | 5/5 ✅ |
-| Email quality | GEval LLM judge | DeepEval + GPT-4o-mini | 0.73 avg ✅ |
+| Email quality | GEval LLM judge | DeepEval + GPT-4o-mini | 0.73–0.77 avg ✅ (varies per run) |
+| LangGraph agent vs golden dataset | LangSmith experiment | `graph_eval.py` | ICP 6/6, personalization 5/5, paused 6/6 ✅ |
 | Personalization quality (online) | Boolean (true/false) | LangSmith OnlineEval | ✅ Active, 100% sampling |
 | PII leakage detection | Online evaluator | LangSmith | ✅ Active |
 | Prompt injection detection | Online evaluator | LangSmith | ✅ Active |
+| Code injection detection | Online evaluator | LangSmith | ✅ Active |
 | Tracing & observability | Online traces | LangSmith | ✅ Active |
 
 ---
