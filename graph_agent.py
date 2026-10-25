@@ -193,7 +193,7 @@ def send(state: SignupState, config: RunnableConfig) -> dict:
         "approved_at": datetime.now(timezone.utc).isoformat(),
     }
     with open(OUTBOX, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record) + "\n")
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
     return {}
 
 
