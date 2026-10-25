@@ -19,3 +19,7 @@ Thumbs.db
 
 # DeepEval telemetry
 .deepeval/
+
+# LangGraph demo runtime files
+checkpoints.sqlite*
+outbox.jsonl

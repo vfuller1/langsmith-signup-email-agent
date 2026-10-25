@@ -45,6 +45,9 @@ These aren't crashes. They're quality failures — and without an eval pipeline,
 langsmith-signup-email-agent/
 ├── agent.py          # Agent definition, structured output schema,
 │                     # golden dataset, and LLM-as-a-Judge
+├── graph_agent.py    # Same agent as a LangGraph graph with a revise
+│                     # loop and human approval
+├── eval.py           # DeepEval suite against the LangSmith dataset
 ├── requirements.txt
 ├── .env.example      # Copy to .env and fill in keys
 ├── .env              # Your real keys — git-ignored
@@ -271,6 +274,52 @@ Safety and quality are separate concerns. Build separate evaluators for each; do
 4. **LLM-as-a-Judge beats exact match.** Reference outputs get stale. A well-prompted judge that evaluates against clear criteria is more robust and easier to maintain.
 
 5. **Safety and quality are separate concerns.** Build separate evaluators for each — don't try to combine them into one judge.
+
+---
+
+## 🕸️ LangGraph Version: Revise Loop + Human Approval
+
+`graph_agent.py` rebuilds the agent as a LangGraph graph. It drafts on its own, but nothing is sent without a person approving it.
+
+```mermaid
+graph TD;
+	__start__([start]) --> classify;
+	classify -.-> draft_high;
+	classify -.-> draft_medium;
+	classify -.-> draft_low;
+	draft_high --> judge;
+	draft_medium --> judge;
+	draft_low --> judge;
+	judge -. "score 0, no revision yet" .-> draft_high;
+	judge -. "score 0, no revision yet" .-> draft_medium;
+	judge -. "score 0, no revision yet" .-> draft_low;
+	judge -. "pass, or revision used" .-> human_approval;
+	human_approval -. approve / edit .-> send;
+	human_approval -. reject .-> __end__([end]);
+	send --> __end__;
+```
+
+| Step | What it does |
+|------|--------------|
+| `classify` | Structured output returns the ICP fit and reason |
+| `draft_high` / `draft_medium` / `draft_low` | A conditional edge picks the tone from the ICP fit (unknown uses the low tone) |
+| `judge` | The existing `judge_personalization()` scores the draft. A 0 sends it back with the judge's feedback, **one revision max** |
+| `human_approval` | `interrupt()` pauses the run and shows the draft |
+| `send` | Stub — appends the approved email to `outbox.jsonl`. Nothing is really sent |
+
+Runs are checkpointed to SQLite (`checkpoints.sqlite`) by `thread_id`, so a paused run can be resumed later from a separate process. Every step is its own span in LangSmith, and the start and resume traces share the `thread_id`.
+
+```powershell
+# Run a signup until it pauses for approval
+python graph_agent.py --case alex --weak-first-draft
+
+# Resume it later with the thread_id it prints
+python graph_agent.py --resume <thread_id> approve
+python graph_agent.py --resume <thread_id> edit --body "Hi Alex, ..."
+python graph_agent.py --resume <thread_id> reject
+```
+
+`--weak-first-draft` forces a generic first draft so the judge fails it and the revise loop is visible. Without it, the current prompt usually passes on the first try. Other options: `--case` (`victor`, `no-name`, `john`, `alex`, `maya`, `minimal`), `--signup "<custom fields>"`, and `--diagram` to print the graph as Mermaid.
 
 ---
 

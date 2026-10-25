@@ -5,3 +5,5 @@ langsmith
 deepeval
 pandas
 python-dotenv
+langgraph
+langgraph-checkpoint-sqlite
