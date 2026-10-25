@@ -317,6 +317,23 @@ graph TD;
 | `human_approval` | `interrupt()` pauses the run and shows the draft |
 | `send` | Stub — appends the approved email to `outbox.jsonl`. Nothing is really sent |
 
+Every step reads and writes one shared state, `SignupState`:
+
+| Field | Type | Holds | Written by |
+|-------|------|-------|------------|
+| `signup` | `str` | Raw signup, one `key: value` per line | Caller, at start |
+| `weak_first_draft` | `bool` | Demo flag: force a generic first draft | Caller, at start |
+| `icp_fit` | `str` | `high`, `medium`, `low` or `unknown` | `classify` |
+| `reason` | `str` | One-sentence reason for the fit | `classify` |
+| `subject` | `str` | Email subject | `draft_*` |
+| `body` | `str` | Email text | `draft_*`, or the person on `edit` |
+| `judge_score` | `int \| str` | `1`, `0` or `"n/a"` | `judge` |
+| `judge_feedback` | `str` | Judge's reason, passed to the rewrite | `judge` |
+| `revision_count` | `int` | Rewrites so far (0 or 1) | `classify` sets 0; `draft_*` adds 1 on a rewrite |
+| `decision` | `str` | `approve`, `edit` or `reject` | `human_approval` |
+
+A judge score of 0 sends the draft back to the **same** draft step it came from (for Alex, `draft_low`), once. A score of 1 or n/a, or a 0 after the rewrite, goes to `human_approval`.
+
 Runs are checkpointed to SQLite (`checkpoints.sqlite`) by `thread_id`, so a paused run can be resumed later from a separate process. Every step is its own span in LangSmith, and the start and resume traces share the `thread_id`.
 
 ```powershell
