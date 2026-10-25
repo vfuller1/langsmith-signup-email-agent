@@ -100,9 +100,9 @@ This runs all 6 golden dataset test cases, prints each email, and scores each on
 TEST: Baseline - High ICP
 ============================================================
 ICP Fit:  high
-Subject:  Welcome to Glop, Sarah! Elevate Your Engineering Team
+Subject:  Welcome to Glop, Victor! Elevate Your Engineering Team
 Body:
-  Hi Sarah, Welcome to Glop! As the VP of Engineering at Acme Corp...
+  Hi Victor, Welcome to Glop! As the VP of Engineering at Acme Corp...
 
 ⚖️  Personalization Score: 1 — Addresses user by name, role, and company context.
 
@@ -319,7 +319,7 @@ For teams using other frameworks:
 
 | Test Case | ICP Fit | Score | Notes |
 |-----------|---------|-------|-------|
-| Baseline — High ICP (Sarah, VP Eng) | high | ✅ 1 | Name + role + company used |
+| Baseline — High ICP (Victor, VP Eng) | high | ✅ 1 | Name + role + company used |
 | Missing first name | medium | ✅ 1 | Fell back to role + company |
 | Generic email domain (gmail) | medium | ✅ 1 | Used first name + role |
 | Unclear role (Associate, 25 ppl) | low | ✅ 1 | Used first name, warm tone |
@@ -332,7 +332,7 @@ For teams using other frameworks:
 
 | | Before | After |
 |---|---|---|
-| **Subject** | "Welcome to Glop, Sarah!" | "Welcome to Glop, Sarah! Elevate Your Engineering Team" |
+| **Subject** | "Welcome to Glop, Victor!" | "Welcome to Glop, Victor! Elevate Your Engineering Team" |
 | **Body** | Generic "leverage our tools" | Role-specific: engineering velocity, scaling |
 | **CTA** | "Feel free to reach out" | "Explore your dashboard to get started" |
 | **Word limit** | 150 words | 120 words |
