@@ -15,6 +15,48 @@ This agent is a template for any SaaS product that wants to **automatically qual
 
 Swap out the Glop branding and ICP criteria for your own product, and this pipeline is ready to wire into a real signup webhook.
 
+### Example: Ledgerline (a made-up company)
+
+*This company and its numbers are made up to show how the agent could be used.*
+
+**The company.** Ledgerline sells payment tools that software teams plug into their apps. People sign up for a free account to try it. Some of them could become big paying customers.
+
+**The problem.**
+- About 1,200 people sign up each week, but there are only 3 salespeople.
+- The salespeople can't read every signup. A top engineering boss gets the same plain welcome as a student.
+- Important leads wait 2–3 days for a personal reply. Some go to a competitor instead.
+- Once, an AI email greeted a finance boss with "Hi there" and used the wrong company name. Now a person must check every email before it goes out.
+
+**How the agent helps.**
+
+| Step | What happens at Ledgerline |
+|------|----------------------------|
+| Sort (ICP fit) | **High:** an engineering or finance leader at a tech company with 50+ people. **Medium:** a developer anywhere. **Low:** students and very small companies. **Unknown:** only an email address. |
+| Write | The email fits the person. Leaders hear how it helps their team grow. Developers hear how fast they can start. Everyone else gets a friendly welcome and a how-to guide. |
+| Check and fix | A second AI checks each email. If it sounds generic, the agent rewrites it once. |
+| Person approves | Each morning, a salesperson looks over the drafts. They can send, change, or throw out each one. |
+| Save and wait | A signup at midnight waits safely until someone logs in. |
+| Send and record | Approved emails go out. LangSmith keeps a record of every draft, score, and choice. |
+
+**One signup, start to finish.**
+1. Tuesday, 11:40 p.m.: Priya, who leads engineering at an 800-person payments company, signs up.
+2. The agent marks her as high fit and writes an email about helping her team.
+3. The checker gives it a 0 because it forgot her company's name. The agent rewrites it, and it gets a 1.
+4. The run pauses and is saved overnight.
+5. Wednesday, 9:05 a.m.: a salesperson adds one line and approves it.
+6. Priya gets a personal email that morning instead of 3 days later.
+
+**What could change** (made-up goals):
+
+| | Before | Goal |
+|---|---|---|
+| Time until a top lead gets a personal reply | 2–3 days | The same morning |
+| Time salespeople spend on small signups | Most of the week | A few minutes a day |
+| Emails with the wrong name or a plain greeting | Nobody knows | Almost none |
+| Record of who approved each email | Search old emails | Every approval saved in LangSmith |
+
+**The big idea:** let the AI do the reading and writing, but keep a person in charge of what gets sent. The same idea works for welcoming new bank clients, answering help tickets, or changing important records.
+
 ---
 
 ## ⚠️ The Problem With Shipping AI Without Evals
