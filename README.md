@@ -48,6 +48,8 @@ langsmith-signup-email-agent/
 ├── graph_agent.py    # Same agent as a LangGraph graph with a revise
 │                     # loop and human approval
 ├── eval.py           # DeepEval suite against the LangSmith dataset
+├── graph_eval.py     # LangSmith experiment: graph_agent.py vs the
+│                     # same golden dataset
 ├── requirements.txt
 ├── .env.example      # Copy to .env and fill in keys
 ├── .env              # Your real keys — git-ignored
@@ -322,6 +324,23 @@ python graph_agent.py --resume <thread_id> reject
 ```
 
 `--weak-first-draft` forces a generic first draft so the judge fails it and the revise loop is visible. Without it, the current prompt usually passes on the first try. Other options: `--case` (`victor`, `no-name`, `john`, `alex`, `maya`, `minimal`), `--signup "<custom fields>"`, and `--diagram` to print the graph as Mermaid.
+
+### Offline eval for the graph
+
+```powershell
+python graph_eval.py
+```
+
+Runs the graph against the same LangSmith golden dataset, stopping at the approval step, and records a LangSmith **experiment** (`graph-agent-…`) under Datasets & Experiments. Each run gets four scores:
+
+| Metric | Checks |
+|--------|--------|
+| `icp_fit_match` | `classify` matches the dataset's reference `icp_fit` |
+| `personalization` | Final judge score after the revise loop (n/a skipped) |
+| `needed_revision` | The first draft failed and was rewritten — a rising rate means the draft prompt is getting worse |
+| `paused_for_approval` | The run stopped at `human_approval` and sent nothing |
+
+First result: ICP fit 6/6, personalization 5/5, revisions 0/6, paused 6/6.
 
 ---
 
