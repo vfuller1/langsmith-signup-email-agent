@@ -49,7 +49,7 @@ ICP fit guidance:
 
 Email rules:
 - Subject: make it specific to the person's role or company, not just "Welcome to Glop"
-- Opening: greet by first name only if provided; otherwise use a generic greeting
+- Opening: if first_name is provided, ALWAYS start the body with "Hi <first_name>," — for every ICP tier; otherwise start with "Hi there,"
 - Body: in 2–3 short sentences, connect Glop's value to their specific role and company context
   - high ICP: emphasize team productivity, scaling, or engineering velocity
   - medium ICP: emphasize individual developer workflow and speed
