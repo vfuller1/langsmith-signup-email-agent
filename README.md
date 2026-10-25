@@ -205,7 +205,7 @@ Results appear in the **LangSmith dashboard** under your project's traces — no
 - **Sampling rate:** 100% (dev) → 10% (production recommended)
 - **Source:** `langsmith-signup-email-agent` project, all Runs
 
-Two evaluators are configured in LangSmith — one for online production monitoring (`personalization_quality`) and one for prompt injection detection:
+Four LLM-as-a-Judge evaluators run on the project's traces in LangSmith — `personalization_quality` for quality, plus `pii_leakage`, `prompt_injection` and `code_injection` for safety (see [Safety Evaluators](#️-safety-evaluators)):
 
 ![LangSmith Evaluators](images/LangSmith%20evaluators.png)
 
@@ -341,6 +341,8 @@ Runs the graph against the same LangSmith golden dataset, stopping at the approv
 | `paused_for_approval` | The run stopped at `human_approval` and sent nothing |
 
 First result: ICP fit 6/6, personalization 5/5, revisions 0/6, paused 6/6.
+
+![LangSmith graph experiment](images/LangSmith%20graph%20experiment.png)
 
 ---
 
