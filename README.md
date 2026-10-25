@@ -1,19 +1,19 @@
 # 🚀 Signup Email Agent
 
-A LangChain agent that processes new user signups, classifies ICP fit, and generates personalized welcome emails — with full LangSmith tracing, a golden eval dataset, and a custom LLM-as-a-Judge scoring pipeline.
+This project uses AI to welcome new users. When someone signs up, the agent decides how good a fit they are as a customer, writes them a personal welcome email, and then checks its own work. A tool called LangSmith keeps a record of every step, and a set of test cases (the "golden dataset") makes sure the emails stay good over time.
 
 ![End to end overview](images/Email%20Agent%20Eval%20end%20to%20end.png)
 
 ## 💡 Use Cases
 
-This agent is a template for any SaaS product that wants to **automatically qualify and engage new signups** without manual effort. Real-world applications include:
+Any company that gets a lot of signups can use this to **sort new users and welcome them, without doing it all by hand**. For example:
 
-- **PLG (Product-Led Growth) onboarding** — trigger a personalized welcome email the moment someone signs up, with messaging tuned to their role and company size
-- **Sales prioritization** — route high-ICP signups to a sales rep immediately, low-ICP to a self-serve nurture sequence
-- **Marketing automation** — feed ICP scores into your CRM (HubSpot, Salesforce) to segment campaigns without a human reviewing every lead
-- **Founder-led sales at early-stage startups** — get a concise "who just signed up and should I reach out?" summary for every new user, automatically
+- **Welcome emails right away** — send a personal email the moment someone signs up, based on their job and company size.
+- **Help salespeople focus** — send the best-fit signups to a salesperson right away, and give everyone else a friendly automated welcome.
+- **Smarter marketing** — save each signup's fit score in a sales tool (like HubSpot or Salesforce) so the right people get the right messages.
+- **Small startups** — get a short "who just signed up, and should I reach out?" note for every new user.
 
-Swap out the Glop branding and ICP criteria for your own product, and this pipeline is ready to wire into a real signup webhook.
+To use it for your own product, change the product name (here it's a made-up tool called "Glop") and the rules for what a good customer looks like.
 
 ### Example: Ledgerline (a made-up company)
 
@@ -59,20 +59,20 @@ Swap out the Glop branding and ICP criteria for your own product, and this pipel
 
 ---
 
-## ⚠️ The Problem With Shipping AI Without Evals
+## ⚠️ Why AI Needs Tests
 
-Most AI agents get shipped with vibes-based quality control. You run it a few times, it looks good, you push to prod. Then three weeks later someone notices the emails sound generic, the classifications are wrong, and nobody knows when it broke.
+Many teams check their AI by trying it a few times. If it looks fine, they ship it. Weeks later, someone notices the emails sound generic or the sorting is wrong, and nobody knows when it started.
 
-"Simple" agents still fail in subtle ways:
-- A VP of Engineering gets a generic "leverage our tools" email
-- A user with no first name gets "Hi ,"
-- A CEO at an 8-person startup gets classified the same as a developer at a 500-person company
+Even a "simple" AI can go wrong in quiet ways:
+- A VP of Engineering gets a bland "use our tools" email.
+- Someone with no first name gets "Hi ,".
+- The CEO of an 8-person startup gets treated the same as a developer at a 500-person company.
 
-These aren't crashes. They're quality failures — and without an eval pipeline, you'll never know they're happening. This project shows how to build the eval layer that catches them.
+None of these cause an error message. The AI keeps running; it just does a worse job. Tests (called **evals**) are how you catch this. This project shows how to build them.
 
 ---
 
-**Stack:** LangChain · LangGraph · LangSmith · DeepEval · OpenAI gpt-4o-mini · Python 3.10+
+**Tools used:** LangChain · LangGraph · LangSmith · DeepEval · OpenAI gpt-4o-mini · Python 3.10+
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
 ![LangChain](https://img.shields.io/badge/LangChain-1.x-green?logo=chainlink&logoColor=white)
@@ -82,48 +82,48 @@ These aren't crashes. They're quality failures — and without an eval pipeline,
 
 ---
 
-## 📁 Project Structure
+## 📁 Project Files
 
 ```
 langsmith-signup-email-agent/
-├── agent.py          # Agent definition, structured output schema,
-│                     # golden dataset, and LLM-as-a-Judge
-├── graph_agent.py    # Same agent as a LangGraph graph with a revise
-│                     # loop and human approval
-├── eval.py           # DeepEval suite against the LangSmith dataset
-├── graph_eval.py     # LangSmith experiment: graph_agent.py vs the
-│                     # same golden dataset
-├── images/           # README diagrams and LangSmith screenshots
-├── requirements.txt
-├── .env.example      # Copy to .env and fill in keys
-├── .env              # Your real keys — git-ignored
+├── agent.py          # The original agent, its 6 test cases,
+│                     # and the AI checker (the "judge")
+├── graph_agent.py    # The same agent built with LangGraph: it can
+│                     # rewrite once and waits for a person to approve
+├── eval.py           # Tests the agent with DeepEval
+├── graph_eval.py     # Tests graph_agent.py and saves the results
+│                     # in LangSmith
+├── images/           # Pictures used in this README
+├── requirements.txt  # The Python packages you need
+├── .env.example      # Copy this to .env and add your keys
+├── .env              # Your real keys (never uploaded)
 └── .gitignore
 ```
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ How the Parts Fit
 
 ![Agent Architecture](images/Agent%20Architecture.png)
 
-Each signup goes through two LLM calls. The agent call classifies ICP fit and writes the email, returned as a Pydantic structured output (`SignupEmailOutput`). A separate LLM-as-a-Judge call then scores personalization (0 / 1 / n/a). LangSmith traces both calls.
+Each signup uses two AI calls. The first one sorts the signup and writes the email. It must answer in a fixed format (`SignupEmailOutput`), so the program always gets the same fields back. The second call, the **judge**, grades the email: 1 for good, 0 for bad, or n/a when there was nothing to personalize. LangSmith records both calls.
 
 ---
 
 ## ⚙️ Setup
 
-**1. Install dependencies**
+**1. Install the packages**
 ```bash
 pip install -r requirements.txt
 ```
 
-**2. Configure environment**
+**2. Add your keys**
 ```bash
 cp .env.example .env
-# Edit .env and fill in your keys
+# Open .env and fill in your keys
 ```
 
-Your `.env` should look like:
+Your `.env` file should look like this:
 ```
 OPENAI_API_KEY=sk-...
 LANGSMITH_API_KEY=lsv2_pt_...
@@ -132,17 +132,17 @@ LANGCHAIN_PROJECT=langsmith-signup-email-agent
 
 ---
 
-## 🚀 Usage
+## 🚀 Running It
 
-**Run the agent + full eval suite**
+**Run the agent and its tests**
 ```bash
-# Keys are loaded from .env automatically
+# Your keys load from .env on their own
 python agent.py
 ```
 
-This runs all 6 golden dataset test cases, prints each email, and scores each one with the LLM-as-a-Judge.
+This runs all 6 test cases. For each one, it prints the email and the judge's score.
 
-**Expected output:**
+**What you should see:**
 ```
 ============================================================
 TEST: Baseline - High ICP
@@ -171,95 +171,98 @@ Total: 5/5 (excluding n/a cases)
 
 ## 🧠 How It Works
 
-### 1. ICP Classification
-**ICP** stands for **Ideal Customer Profile** — a description of the type of company or person most likely to get value from your product and become a long-term customer. In a SaaS context, ICP fit is used to prioritize sales and marketing effort: high-fit signups get white-glove outreach, low-fit signups get a lighter touch.
+### 1. Sorting Signups (ICP Fit)
+**ICP** means **Ideal Customer Profile**: the kind of person or company most likely to get real value from the product and keep paying for it. **ICP fit** is how closely a new signup matches that picture.
 
-The signup is sent to the model as plain `key: value` text. There's no input model, so the edge cases (missing name, email only) reach the model as they are. Pydantic is used on the **output**: `SignupEmailOutput` limits `icp_fit` to the four tiers below and returns `to`, `reason`, `subject` and `body` as a validated object:
+The signup goes to the AI as plain text, one `key: value` per line. Nothing checks the signup first, so missing details (like no first name) reach the AI as they are. The AI's **answer** is checked, though: `SignupEmailOutput` only allows the four fit levels below, and it must return `to`, `reason`, `subject` and `body`.
 
 ![Structured Output Schema](images/Structured%20Output%20Schema.png)
 
-| ICP fit | Rule | Example from the test cases | Typical treatment |
-|---------|------|-----------------------------|-------------------|
-| `high` | Engineering/product leader at a tech or SaaS company, 50+ employees | Victor, VP of Engineering, Acme Corp (500 people) | Personal sales outreach — a possible team account |
-| `medium` | Developer or technical role at any company | John, Developer; a Software Engineer at TechCorp | Self-serve onboarding for individual developers |
-| `low` | Non-technical role or company < 10 employees | Alex, Associate; Maya, CEO of an 8-person startup | Friendly automated welcome, no sales push |
-| `unknown` | Insufficient information | A signup with only an email address | Generic welcome, maybe ask for more details |
+| ICP fit | Rule | Example from the test cases | What they usually get |
+|---------|------|-----------------------------|-----------------------|
+| `high` | An engineering or product leader at a tech company with 50+ people | Victor, VP of Engineering, Acme Corp (500 people) | A personal note from a salesperson |
+| `medium` | A developer or other technical job, at any company | John, Developer; a Software Engineer at TechCorp | Self-serve help for developers |
+| `low` | A non-technical job, or a company with fewer than 10 people | Alex, Associate; Maya, CEO of an 8-person startup | A friendly automated welcome |
+| `unknown` | Not enough information | A signup with only an email address | A general welcome |
 
-Sales and marketing time is limited, so ICP fit decides who gets which treatment. In this project it also picks the email's **tone**: team productivity for high, developer speed for medium, warm and simple for low or unknown. In `graph_agent.py`, that's the `route_by_tone` decision that chooses `draft_high`, `draft_medium` or `draft_low`.
+Salespeople have limited time, so the fit decides who gets what. In this project, the fit also picks the email's **tone**. In `graph_agent.py`, a function called `route_by_tone` makes that choice and picks `draft_high`, `draft_medium` or `draft_low`.
 
-### 2. Email Generation
-Emails are generated with ICP-tier-specific value props:
-- **High** → team productivity, scaling, engineering velocity
-- **Medium** → individual developer workflow and speed
-- **Low** → warm, simple, no jargon — always uses first name if provided
-- **Unknown** → generic and inviting
+### 2. Writing the Email
+Each fit level gets a different message:
+- **High** → how Glop helps their whole team work faster and grow
+- **Medium** → how Glop speeds up their own work as a developer
+- **Low** → warm and simple, no tech words, and always their first name if we have it
+- **Unknown** → general and friendly
 
-### 3. LLM-as-a-Judge
-After each email is generated, a second LLM call (`judge_personalization()`) scores personalization quality. It sees only the signup and the email body, and scores against fixed rules rather than a stored reference answer. In `graph_agent.py`, the same judge decides whether a draft gets one rewrite:
+### 3. The AI Judge
+After each email is written, a second AI call (`judge_personalization()`) grades it. The judge only sees the signup and the email. It grades against fixed rules, not a stored "right answer". In `graph_agent.py`, the same judge decides if a draft gets one rewrite.
 
 ![LLM-as-a-Judge Flow](images/LLM-as-a-Judge%20Flow.png)
 
 ```
-Score 1   → name used + role/company referenced + context-specific value prop
-Score 0   → generic greeting when name available, or role/company ignored
-Score n/a → no personalizable data existed in the input (not a failure)
+Score 1   → uses the name, mentions their job or company, and explains why Glop helps them
+Score 0   → generic greeting even though we had a name, or ignores their job or company
+Score n/a → there was nothing to personalize (this is not a failure)
 ```
 
 ---
 
-## 🧪 Evaluation Strategy: Online vs Offline
+## 🧪 Testing: Before and After You Ship
 
-This project implements both types of eval that matter in production AI systems.
+This project tests the AI in two ways: before you release a change (**offline**) and while it runs for real (**online**).
 
-### Offline Eval — run manually before shipping a prompt change
+### Offline Tests — run these yourself before you change the prompt
 
 ```powershell
-# Option 1: agent.py golden dataset (custom LLM judge, runs locally)
+# Option 1: the 6 test cases in agent.py, graded by the judge
 python agent.py
 
-# Option 2: eval.py DeepEval suite (pulls from LangSmith dataset, uses DeepEval metrics)
+# Option 2: DeepEval tests, using the test cases saved in LangSmith
 python eval.py
 
-# Option 3: graph_eval.py — the LangGraph version, recorded as a LangSmith experiment
+# Option 3: tests for the LangGraph version, saved in LangSmith
 python graph_eval.py
 ```
 
-**What it is:** Batch evaluations against the 6 golden test cases. `agent.py` scores each email with the custom `judge_personalization()` (1 pass, 0 fail, or n/a). `eval.py` pulls the dataset from LangSmith and scores ICP fit and email quality with DeepEval GEval metrics. `graph_eval.py` is covered in the [LangGraph section](#offline-eval-for-the-graph).
+**What they do:** each one runs the 6 test cases and grades the results.
+- `agent.py` grades each email with the judge (1, 0 or n/a).
+- `eval.py` pulls the test cases from LangSmith and grades the fit and the email with DeepEval, another testing tool.
+- `graph_eval.py` is explained in the [LangGraph section](#offline-eval-for-the-graph).
 
-**Purpose:** Give you a reproducible, before/after comparison when you change the prompt. These are essentially unit/integration tests for your agent — run them before every deployment to catch regressions.
+**Why:** when you change the prompt, you can compare scores before and after. Think of them as practice tests: run them before every release to catch anything that got worse.
 
-The golden dataset lives in LangSmith and contains all 6 test cases with their reference outputs:
+The test cases are saved in LangSmith, with the answer we expect for each one:
 
 ![LangSmith Golden Dataset](images/LangSmith%20golden-dataset.png)
 
-**Result: 5/5 ✅** (1 n/a excluded)
+**Result: 5/5 ✅** (1 n/a case not counted)
 
-### Online Eval — no command needed, runs automatically
+### Online Tests — these run on their own
 
 ```
-# Nothing to run — just invoke the agent normally and LangSmith scores it automatically.
-python agent.py          # or any production invocation (webhook, API call, etc.)
+# Nothing to run. Use the agent as normal, and LangSmith grades it.
+python agent.py          # or any real use of the agent
 ```
 
-Results appear in the **LangSmith dashboard** under your project's traces — not in the terminal.
+You see the results on the **LangSmith website**, not in your terminal.
 
-**What it is:** A LangSmith Online Evaluator (`personalization_quality`) configured to run on traces from the `langsmith-signup-email-agent` project. After every agent run, LangSmith automatically scores the output and attaches a `true/false` feedback tag to the trace.
+**What it is:** LangSmith runs a checker called `personalization_quality` on every run of the agent. It adds a true/false grade to each run's record.
 
-**Sampling rate:** Set to 100% for development. In production, **10% is recommended** — this gives statistically significant quality metrics without paying for an evaluator LLM call on every single user interaction. Evaluators are LLM calls too: in the week of Oct 19–25, 2026, the four evaluators cost $4.83 across 406 runs, while the agent itself cost $0.01.
+**How often:** right now it checks 100% of runs, which is fine while building. For a real product, checking about **10%** is enough to see how things are going without paying to check every single run. The checkers cost money too: in the week of Oct 19–25, 2026, the four checkers cost $4.83 across 406 runs, while the agent itself cost $0.01.
 
-**Known gap:** in `agent.py`, the agent call and the judge call are each their own root trace, so the online evaluator also scores the judge's calls. In production, filter the rule to agent runs only.
+**Known problem:** in `agent.py`, the agent call and the judge call are recorded separately. So the online checker also grades the judge's answers, not just the emails. A real setup should only check the agent's runs.
 
-**LangSmith configuration:**
-- **Evaluator:** OnlineEval → `personalization_quality`
-- **Feedback key:** `personalization_quality` (Boolean)
-- **Sampling rate:** 100% (dev) → 10% (production recommended)
-- **Source:** `langsmith-signup-email-agent` project, all Runs
+**LangSmith settings:**
+- **Checker:** OnlineEval → `personalization_quality`
+- **Grade name:** `personalization_quality` (true/false)
+- **How often:** 100% now → 10% for a real product
+- **Checks:** every run in the `langsmith-signup-email-agent` project
 
-Four LLM-as-a-Judge evaluators run on the project's traces in LangSmith — `personalization_quality` for quality, plus `pii_leakage`, `prompt_injection` and `code_injection` for safety (see [Safety Evaluators](#️-safety-evaluators)):
+Four AI checkers run in LangSmith. One checks quality (`personalization_quality`), and three check safety: `pii_leakage`, `prompt_injection` and `code_injection` (see [Safety Evaluators](#️-safety-evaluators)).
 
 ![LangSmith Evaluators](images/LangSmith%20evaluators.png)
 
-How traces flow from the scripts into LangSmith, through the evaluators, and back into the golden dataset:
+How each run's record goes from the code into LangSmith, through the checkers, and back into the test cases:
 
 ![LangSmith Telemetry](images/LangSmith%20Telemetry.png)
 
@@ -267,71 +270,71 @@ How traces flow from the scripts into LangSmith, through the evaluators, and bac
 
 | | Offline (agent.py) | Online (LangSmith) |
 |---|---|---|
-| **When it runs** | Manually, before shipping a change | Automatically on every invocation |
-| **What it catches** | Prompt regressions before they ship | Production drift and live failures |
-| **Output** | Aggregate pass rate in terminal | Per-run score in LangSmith traces |
-| **Best for** | Iterating on the prompt confidently | Monitoring quality over time |
+| **When it runs** | When you run it, before a change | On its own, every time the agent runs |
+| **What it catches** | A prompt change that made things worse | Problems that show up with real users |
+| **Where you see results** | A total score in your terminal | A grade on each run in LangSmith |
+| **Best for** | Changing the prompt with confidence | Watching quality over time |
 
-Offline eval tells you if your changes made things better or worse before you ship. Online eval tells you if things break in production. You need both.
+Offline tests tell you if a change helped or hurt before you ship it. Online tests tell you if something breaks after. You need both.
 
 ---
 
-## 🔄 The Continuous Improvement Loop
+## 🔄 The Improvement Cycle
 
 ```
-01 DEVELOPMENT
-   Run offline evals in agent.py against the golden dataset
+01 BUILD
+   Run the offline tests in agent.py
         ↓
-02 DEPLOYMENT
-   Deploy agent (e.g. webhook, Cloud Run, API)
+02 RELEASE
+   Put the agent to work (for example, on your signup form)
         ↓
-03 MONITORING
-   LangSmith Online Evaluator scores live traces automatically
-   Recommended sampling rate: 10% in production
+03 WATCH
+   LangSmith checks real runs on its own
+   (about 10% of runs for a real product)
         ↓
-04 REFINEMENT
-   Export production failures → add to golden dataset
-   Fix prompt → re-run offline evals → confirm improvement
-        ↓ (loop)
+04 IMPROVE
+   Add real failures to the test cases
+   Fix the prompt → run the tests again → check it got better
+        ↓ (repeat)
 ```
 
-**Key insight:** Errors identified in production traces should be exported back into the golden dataset. This creates a feedback loop where your offline test suite gets stronger every time something breaks in prod.
+**The key idea:** when something goes wrong for a real user, add that case to the test cases. That way your tests get stronger every time something breaks.
 
 ---
 
 ## 🛡️ Safety Evaluators
 
-Beyond quality, three additional online evaluators run automatically in LangSmith:
+Besides checking quality, three more checkers run on their own in LangSmith:
 
-| Evaluator | What it flags | Response |
-|-----------|--------------|----------|
-| **PII Leakage** | Sensitive personal data appearing in agent input | Routes trace to human review queue via LangSmith Automation |
-| **Prompt Injection** | Attempts to hijack the agent via malicious input | Flags trace with `prompt_injection: true` |
-| **Code Injection** | Code-based attack patterns in input | Flags trace with `code_injection: true` |
+| Checker | What it looks for | What happens |
+|---------|-------------------|--------------|
+| **PII Leakage** | Private personal information in the signup | Sends the run to a review list for a person to check |
+| **Prompt Injection** | Someone trying to trick the AI with sneaky instructions | Marks the run `prompt_injection: true` |
+| **Code Injection** | Someone trying to slip in harmful code | Marks the run `code_injection: true` |
 
-When `pii_leakage: true` fires, a LangSmith automation rule (PII Alert) routes the trace to `pii-review-queue` — no manual monitoring required. Because every signup contains a name and an email, `pii_leakage` currently flags most traces; in production you'd tune it to flag only unexpected PII.
+When `pii_leakage` is true, a LangSmith rule (PII Alert) sends the run to a review list called `pii-review-queue`, so nobody has to watch for it. Every signup has a name and an email, so right now this checker flags most runs. A real setup should only flag private information that isn't expected.
 
-Safety and quality are separate concerns. Build separate evaluators for each; don't combine them into one judge.
+Keep safety and quality separate. Build one checker for each, instead of one checker that tries to do both.
 
 ---
 
 ## 💡 Key Takeaways
 
-1. **Evals aren't optional for production AI.** Without them, you're flying blind — no way to know if your agent is getting better or worse as you iterate.
+1. **Real AI products need tests.** Without them, you can't tell if your changes make the AI better or worse.
 
-2. **Start with a golden dataset.** Even 5–6 examples covering your known edge cases catches most regressions. Add to it every time something breaks in prod.
+2. **Start with a small set of test cases.** Even 5 or 6 tricky examples catch most problems. Add a new one every time something breaks.
 
-3. **Online + offline evals serve different purposes.** Offline tells you if your changes made things better before you ship. Online tells you if things break after you ship. You need both.
+3. **Test before and after you ship.** Offline tests catch problems before release. Online tests catch problems with real users. You need both.
 
-4. **LLM-as-a-Judge beats exact match.** Reference outputs get stale. A well-prompted judge that evaluates against clear criteria is more robust and easier to maintain.
+4. **An AI judge works better than an exact match.** Stored "right answers" go out of date. A judge with clear rules is easier to keep up to date.
 
-5. **Safety and quality are separate concerns.** Build separate evaluators for each — don't try to combine them into one judge.
+5. **Keep safety and quality separate.** Build a different checker for each.
 
 ---
 
-## 🕸️ LangGraph Version: Revise Loop + Human Approval
+## 🕸️ LangGraph Version: Rewrite Once, Then a Person Approves
 
-`graph_agent.py` rebuilds the agent as a LangGraph graph. It drafts on its own, but nothing is sent without a person approving it.
+`graph_agent.py` builds the same agent with LangGraph, a tool for laying out an AI's work as steps. It writes drafts on its own, but nothing is sent until a person approves it.
 
 ![LangGraph Human Approval Flow](images/LangGraph%20Human%20Approval%20Flow.png)
 
@@ -344,10 +347,10 @@ graph TD;
 	draft_high --> judge;
 	draft_medium --> judge;
 	draft_low --> judge;
-	judge -. "score 0, no revision yet" .-> draft_high;
-	judge -. "score 0, no revision yet" .-> draft_medium;
-	judge -. "score 0, no revision yet" .-> draft_low;
-	judge -. "pass, or revision used" .-> human_approval;
+	judge -. "score 0, no rewrite yet" .-> draft_high;
+	judge -. "score 0, no rewrite yet" .-> draft_medium;
+	judge -. "score 0, no rewrite yet" .-> draft_low;
+	judge -. "passed, or rewrite used" .-> human_approval;
 	human_approval -. approve / edit .-> send;
 	human_approval -. reject .-> __end__([end]);
 	send --> __end__;
@@ -355,42 +358,42 @@ graph TD;
 
 | Step | What it does |
 |------|--------------|
-| `classify` | Structured output returns the ICP fit and reason |
-| `draft_high` / `draft_medium` / `draft_low` | A conditional edge picks the tone from the ICP fit (unknown uses the low tone) |
-| `judge` | The existing `judge_personalization()` scores the draft. A 0 sends it back with the judge's feedback, **one revision max** |
-| `human_approval` | `interrupt()` pauses the run and shows the draft |
-| `send` | Stub — appends the approved email to `outbox.jsonl`. Nothing is really sent |
+| `classify` | Sorts the signup (ICP fit) and says why |
+| `draft_high` / `draft_medium` / `draft_low` | Writes the email in the tone that matches the fit (unknown uses the low tone) |
+| `judge` | Grades the draft with `judge_personalization()`. A 0 sends it back with the judge's notes, **one rewrite at most** |
+| `human_approval` | Pauses with `interrupt()` and shows the draft to a person |
+| `send` | A stand-in for sending: it writes the approved email to `outbox.jsonl`. Nothing is really sent |
 
-Every step reads and writes one shared state, `SignupState`:
+Every step reads from and writes to one shared record, called `SignupState`:
 
-| Field | Type | Holds | Written by |
-|-------|------|-------|------------|
-| `signup` | `str` | Raw signup, one `key: value` per line | Caller, at start |
-| `weak_first_draft` | `bool` | Demo flag: force a generic first draft | Caller, at start |
-| `icp_fit` | `str` | `high`, `medium`, `low` or `unknown` | `classify` |
-| `reason` | `str` | One-sentence reason for the fit | `classify` |
-| `subject` | `str` | Email subject | `draft_*` |
-| `body` | `str` | Email text | `draft_*`, or the person on `edit` |
-| `judge_score` | `int \| str` | `1`, `0` or `"n/a"` | `judge` |
-| `judge_feedback` | `str` | Judge's reason, passed to the rewrite | `judge` |
-| `revision_count` | `int` | Rewrites so far (0 or 1) | `classify` sets 0; `draft_*` adds 1 on a rewrite |
-| `decision` | `str` | `approve`, `edit` or `reject` | `human_approval` |
+| Field | Type | What it holds | Who fills it in |
+|-------|------|---------------|-----------------|
+| `signup` | `str` (text) | The signup, one `key: value` per line | You, at the start |
+| `weak_first_draft` | `bool` (yes/no) | Demo switch: makes the first draft bland on purpose | You, at the start |
+| `icp_fit` | `str` (text) | `high`, `medium`, `low` or `unknown` | `classify` |
+| `reason` | `str` (text) | One sentence on why | `classify` |
+| `subject` | `str` (text) | The email's subject line | `draft_*` |
+| `body` | `str` (text) | The email itself | `draft_*`, or the person on `edit` |
+| `judge_score` | `int \| str` (number or text) | `1`, `0` or `"n/a"` | `judge` |
+| `judge_feedback` | `str` (text) | The judge's notes, given to the rewrite | `judge` |
+| `revision_count` | `int` (number) | How many rewrites so far (0 or 1) | `classify` sets 0; `draft_*` adds 1 on a rewrite |
+| `decision` | `str` (text) | `approve`, `edit` or `reject` | `human_approval` |
 
-A judge score of 0 sends the draft back to the **same** draft step it came from (for Alex, `draft_low`), once. A score of 1 or n/a, or a 0 after the rewrite, goes to `human_approval`.
+A score of 0 sends the draft back to the **same** writing step it came from (for Alex, `draft_low`), one time. A score of 1 or n/a, or a 0 after the rewrite, goes to `human_approval`.
 
-Runs are checkpointed to SQLite (`checkpoints.sqlite`) by `thread_id`, so a paused run can be resumed later from a separate process. Every step is its own span in LangSmith, and the start and resume traces share the `thread_id`.
+The run is saved to a small database file (`checkpoints.sqlite`) under an ID called `thread_id`. So a paused run can be picked up later, even after the program closes. LangSmith records every step, and the paused run and the resumed run share the same `thread_id`.
 
 ```powershell
-# Run a signup until it pauses for approval
+# Run one signup until it stops for approval
 python graph_agent.py --case alex --weak-first-draft
 
-# Resume it later with the thread_id it prints
+# Later, finish it using the thread_id it printed
 python graph_agent.py --resume <thread_id> approve
 python graph_agent.py --resume <thread_id> edit --body "Hi Alex, ..."
 python graph_agent.py --resume <thread_id> reject
 ```
 
-`--weak-first-draft` forces a generic first draft so the judge fails it and the revise loop is visible. Without it, the current prompt usually passes on the first try. Other options: `--case` (`victor`, `no-name`, `john`, `alex`, `maya`, `minimal`), `--signup "<custom fields>"`, and `--diagram` to print the graph as Mermaid.
+`--weak-first-draft` makes the first draft bland on purpose, so you can watch the judge fail it and the agent rewrite it. Without it, the prompt usually passes on the first try. Other options: `--case` (`victor`, `no-name`, `john`, `alex`, `maya`, `minimal`), `--signup "<your own details>"`, and `--diagram` to print the steps as a diagram.
 
 ### Offline eval for the graph
 
@@ -398,16 +401,16 @@ python graph_agent.py --resume <thread_id> reject
 python graph_eval.py
 ```
 
-Runs the graph against the same LangSmith golden dataset, stopping at the approval step, and records a LangSmith **experiment** (`graph-agent-…`) under Datasets & Experiments. Each run gets four scores:
+This runs the LangGraph agent on the same 6 test cases, stopping at the approval step. It saves the results in LangSmith as an **experiment** (`graph-agent-…`) under Datasets & Experiments. Each run gets four scores:
 
-| Metric | Checks |
-|--------|--------|
-| `icp_fit_match` | `classify` matches the dataset's reference `icp_fit` |
-| `personalization` | Final judge score after the revise loop (n/a skipped) |
-| `needed_revision` | The first draft failed and was rewritten — a rising rate means the draft prompt is getting worse |
-| `paused_for_approval` | The run stopped at `human_approval` and sent nothing |
+| Score | What it checks |
+|-------|----------------|
+| `icp_fit_match` | The fit matches the answer we expect |
+| `personalization` | The judge's final score after any rewrite (n/a not counted) |
+| `needed_revision` | The first draft failed and was rewritten. If this goes up, the prompt is getting worse |
+| `paused_for_approval` | The run stopped for a person and sent nothing |
 
-First result: ICP fit 6/6, personalization 5/5, revisions 0/6, paused 6/6.
+First result: fit 6/6, personalization 5/5, rewrites 0/6, paused 6/6.
 
 ![LangSmith graph experiment](images/LangSmith%20graph%20experiment.png)
 
@@ -415,91 +418,91 @@ First result: ICP fit 6/6, personalization 5/5, revisions 0/6, paused 6/6.
 
 ## 🛠️ Troubleshooting
 
-### LangSmith 403 Forbidden
-Check `LANGSMITH_API_KEY` in `.env`. A key set in your terminal takes priority over `.env` (`load_dotenv()` doesn't override existing variables), so clear an old one:
+### LangSmith says "403 Forbidden"
+Check `LANGSMITH_API_KEY` in your `.env` file. If an old key is set in your terminal, it wins over `.env`, so clear it:
 ```powershell
 Remove-Item Env:LANGSMITH_API_KEY
 python agent.py
 ```
 
-### KeyError in LangSmith Evaluator
-A common error where the evaluator expects a specific JSON key (e.g. `outputs_one`) that doesn't match the actual trace structure. Fix: open a failing trace in LangSmith, inspect the raw JSON output, and verify the top-level key names match what your evaluator prompt references via `{{output}}`.
+### "KeyError" in a LangSmith checker
+The checker is looking for a name in the run's data that isn't there (for example, `outputs_one`). To fix it, open a failing run in LangSmith, look at the raw data, and make sure the names match what the checker's prompt uses in `{{output}}`.
 
-### Simulating Failures to Test the Feedback Loop
-Two reliable ways to generate failures for testing:
-- **Prompt degradation** — temporarily weaken the system prompt (e.g. remove the name/role instructions) to produce generic emails that score 0
-- **Data edge cases** — introduce malformed inputs (missing name, generic domain, incomplete context) into the test set — these are already covered in the golden dataset
+### Making failures on purpose to test the cycle
+Two easy ways:
+- **Weaken the prompt** — for a short time, remove the rules about names and jobs. The emails get bland and score 0.
+- **Use tricky signups** — like no name, a gmail address, or only an email. These are already in the test cases.
 
-### Dataset Count Mismatch
-If your local example count doesn't match what LangSmith shows, this is likely a caching or sync issue. Refresh the LangSmith dataset page and re-run to force a fresh fetch.
-
----
-
-## 🌐 Framework Compatibility
-
-This project uses **LangChain + LangSmith**, which are tightly coupled and the recommended pairing for LangChain-based agents.
-
-For teams using other frameworks:
-
-| Framework | Observability | Offline Eval |
-|-----------|--------------|--------------|
-| LangChain | LangSmith (native) | `judge_personalization()` in agent.py |
-| Google ADK | OpenTelemetry | DeepEval (native ADK integration) |
-| Custom agents | LangSmith or LangFuse via OpenTelemetry | DeepEval |
-
-**Recommendation:** Choose an observability platform that actively tracks the release cycle of your underlying framework. For LangChain users, LangSmith is the natural choice.
+### The number of test cases doesn't match
+If your count doesn't match LangSmith's, it's probably out of date. Refresh the LangSmith page and run it again.
 
 ---
 
-## 📊 Eval Results
+## 🌐 Other Tools
+
+This project uses **LangChain and LangSmith**, which are made to work together.
+
+If your team uses something else:
+
+| Tool for building the AI | Tool for recording runs | Tool for testing |
+|--------------------------|-------------------------|------------------|
+| LangChain | LangSmith | `judge_personalization()` in agent.py |
+| Google ADK | OpenTelemetry | DeepEval |
+| Your own code | LangSmith or LangFuse, through OpenTelemetry | DeepEval |
+
+**Tip:** pick a recording tool that keeps up with new versions of the building tool you use. If you use LangChain, LangSmith is the natural pick.
+
+---
+
+## 📊 Test Results
 
 ### Personalization Score: 5/5 ✅
-*(1 n/a case excluded — no personalizable data in input)*
+*(1 n/a case not counted: there was nothing to personalize)*
 
-| Test Case | ICP Fit | Score | Notes |
+| Test case | ICP fit | Score | Notes |
 |-----------|---------|-------|-------|
-| Baseline — High ICP (Victor, VP Eng) | high | ✅ 1 | Name + role + company used |
-| Missing first name | medium | ✅ 1 | Fell back to role + company |
-| Generic email domain (gmail) | medium | ✅ 1 | Used first name + role |
-| Unclear role (Associate, 25 ppl) | low | ✅ 1 | Used first name, warm tone |
-| Stealth company (CEO, 8 ppl) | low | ✅ 1 | Used first name |
-| Incomplete context (email only) | unknown | ⏭️ n/a | No data to personalize |
+| Normal, high fit (Victor, VP of Engineering) | high | ✅ 1 | Used his name, job, and company |
+| No first name | medium | ✅ 1 | Used the job and company instead |
+| Gmail address | medium | ✅ 1 | Used the first name and job |
+| Unclear job (Associate, 25 people) | low | ✅ 1 | Used the first name, warm tone |
+| Hidden company (CEO, 8 people) | low | ✅ 1 | Used the first name |
+| Only an email address | unknown | ⏭️ n/a | Nothing to personalize |
 
 ---
 
-## 📈 Before vs After Prompt Improvement
+## 📈 Before and After Fixing the Prompt
 
 | | Before | After |
 |---|---|---|
 | **Subject** | "Welcome to Glop, Victor!" | "Welcome to Glop, Victor! Elevate Your Engineering Team" |
-| **Body** | Generic "leverage our tools" | Role-specific: engineering velocity, scaling |
-| **CTA** | "Feel free to reach out" | "Explore your dashboard to get started" |
+| **Email** | Bland "use our tools" | Fits the job: team speed and growth |
+| **Next step** | "Feel free to reach out" | "Explore your dashboard to get started" |
 | **Word limit** | 150 words | 120 words |
-| **Low ICP fallback** | Dropped name | Always uses first name if provided |
-| **Eval score** | 4/6 (before prompt fix) | 5/5 ✅ |
+| **Low-fit signups** | Lost the first name | Always uses the first name if we have it |
+| **Test score** | 4/6 (before the fix) | 5/5 ✅ |
 
 ---
 
-## 📏 Evaluation Metrics
+## 📏 Everything We Measure
 
-| Metric | Type | Tool | Result |
-|--------|------|------|--------|
-| ICP fit classification | Structured output | Pydantic + GPT-4o-mini | ✅ All cases correct |
-| ICP fit quality | GEval LLM judge | DeepEval + GPT-4o-mini | 0.78–0.80 avg ✅ (varies per run) |
-| Personalization quality (offline) | LLM-as-a-Judge (0/1/n/a) | `judge_personalization()` in agent.py | 5/5 ✅ |
-| Email quality | GEval LLM judge | DeepEval + GPT-4o-mini | 0.73–0.77 avg ✅ (varies per run) |
-| LangGraph agent vs golden dataset | LangSmith experiment | `graph_eval.py` | ICP 6/6, personalization 5/5, paused 6/6 ✅ |
-| Personalization quality (online) | Boolean (true/false) | LangSmith OnlineEval | ✅ Active, 100% sampling |
-| PII leakage detection | Online evaluator | LangSmith | ✅ Active |
-| Prompt injection detection | Online evaluator | LangSmith | ✅ Active |
-| Code injection detection | Online evaluator | LangSmith | ✅ Active |
-| Tracing & observability | Online traces | LangSmith | ✅ Active |
+| What we measure | How | Tool | Result |
+|-----------------|-----|------|--------|
+| Sorting (ICP fit) | Fixed answer format | Pydantic + GPT-4o-mini | ✅ All correct |
+| Sorting quality | AI judge | DeepEval + GPT-4o-mini | About 0.78–0.80 ✅ (changes a little each run) |
+| Personalization (offline) | AI judge (1, 0 or n/a) | `judge_personalization()` in agent.py | 5/5 ✅ |
+| Email quality | AI judge | DeepEval + GPT-4o-mini | About 0.73–0.77 ✅ (changes a little each run) |
+| LangGraph version on the test cases | LangSmith experiment | `graph_eval.py` | Fit 6/6, personalization 5/5, paused 6/6 ✅ |
+| Personalization (online) | True/false grade | LangSmith OnlineEval | ✅ On, checks 100% |
+| Private info | Online checker | LangSmith | ✅ On |
+| Sneaky instructions | Online checker | LangSmith | ✅ On |
+| Harmful code | Online checker | LangSmith | ✅ On |
+| Records of every run | Run records | LangSmith | ✅ On |
 
 ---
 
 ## 🔗 Get the Code
 
-The full project is open source. If you're building AI agents and haven't thought about evals yet, this is a good place to start.
+The whole project is free to use. If you're building AI agents and haven't thought about testing yet, this is a good place to start.
 
 👉 [github.com/vfuller1/langsmith-signup-email-agent](https://github.com/vfuller1/langsmith-signup-email-agent)
 
