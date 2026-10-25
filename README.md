@@ -281,6 +281,8 @@ Safety and quality are separate concerns. Build separate evaluators for each; do
 
 `graph_agent.py` rebuilds the agent as a LangGraph graph. It drafts on its own, but nothing is sent without a person approving it.
 
+![LangGraph Human Approval Flow](images/LangGraph%20Human%20Approval%20Flow.png)
+
 ```mermaid
 graph TD;
 	__start__([start]) --> classify;
