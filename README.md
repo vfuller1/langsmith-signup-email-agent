@@ -387,10 +387,14 @@ The run is saved to a small database file (`checkpoints.sqlite`) under an ID cal
 # Run one signup until it stops for approval
 python graph_agent.py --case alex --weak-first-draft
 
-# Later, finish it using the thread_id it printed
+# Later, finish it. "last" means the most recent paused run
+python graph_agent.py --resume last approve
+python graph_agent.py --resume last edit --body "Hi Alex, ..."
+python graph_agent.py --resume last reject
+
+# See every run waiting for approval, then pick one by its thread_id
+python graph_agent.py --pending
 python graph_agent.py --resume <thread_id> approve
-python graph_agent.py --resume <thread_id> edit --body "Hi Alex, ..."
-python graph_agent.py --resume <thread_id> reject
 ```
 
 `--weak-first-draft` makes the first draft bland on purpose, so you can watch the judge fail it and the agent rewrite it. Without it, the prompt usually passes on the first try. Other options: `--case` (`victor`, `no-name`, `john`, `alex`, `maya`, `minimal`), `--signup "<your own details>"`, and `--diagram` to print the steps as a diagram.

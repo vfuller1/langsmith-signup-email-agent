@@ -9,8 +9,10 @@ resumed later from a separate process. "send" only writes to outbox.jsonl.
 
 Usage:
     python graph_agent.py --case alex --weak-first-draft     # run until approval
+    python graph_agent.py --resume last approve               # most recent paused run
     python graph_agent.py --resume <thread_id> approve        # or: reject
     python graph_agent.py --resume <thread_id> edit --body "New email body"
+    python graph_agent.py --pending                           # list runs waiting for approval
     python graph_agent.py --signup "email: a@b.com
 first_name: Ann"                                              # any custom signup
     python graph_agent.py --diagram                           # print Mermaid diagram
@@ -37,6 +39,7 @@ from agent import judge_personalization
 HERE = Path(__file__).parent
 CHECKPOINT_DB = HERE / "checkpoints.sqlite"
 OUTBOX = HERE / "outbox.jsonl"
+LAST_THREAD = HERE / "last_thread.txt"  # lets `--resume last` skip typing the thread_id
 MAX_REVISIONS = 1
 
 
@@ -274,12 +277,31 @@ def stream(app, payload, config) -> None:
     state = app.get_state(config)
     thread_id = config["configurable"]["thread_id"]
     if state.next:
+        LAST_THREAD.write_text(thread_id, encoding="utf-8")
         print(f"\n⏸  Paused for human approval (thread_id: {thread_id})")
-        print(f"   Approve: python graph_agent.py --resume {thread_id} approve")
-        print(f"   Edit:    python graph_agent.py --resume {thread_id} edit --body \"...\"")
-        print(f"   Reject:  python graph_agent.py --resume {thread_id} reject")
+        print("   Approve: python graph_agent.py --resume last approve")
+        print("   Edit:    python graph_agent.py --resume last edit --body \"...\"")
+        print("   Reject:  python graph_agent.py --resume last reject")
+        print(f"   (\"last\" = {thread_id}; use the full id to pick an older run)")
     else:
         print(f"\n✔  Done (thread_id: {thread_id}, decision: {state.values.get('decision')})")
+
+
+def list_pending(app, checkpointer) -> None:
+    thread_ids = {c.config["configurable"]["thread_id"] for c in checkpointer.list(None)}
+    waiting = []
+    for thread_id in sorted(thread_ids):
+        state = app.get_state({"configurable": {"thread_id": thread_id}})
+        if state.next:
+            waiting.append((thread_id, state.values))
+    if not waiting:
+        print("No runs are waiting for approval.")
+        return
+    print(f"{len(waiting)} run(s) waiting for approval:\n")
+    for thread_id, values in waiting:
+        print(f"  {thread_id}   fit: {values.get('icp_fit')}   judge: {values.get('judge_score')}")
+        print(f"    Subject: {values.get('subject')}")
+    print("\nFinish one with: python graph_agent.py --resume <thread_id> approve")
 
 
 def make_config(thread_id: str, run_name: str) -> dict:
@@ -298,8 +320,9 @@ def main() -> None:
     parser.add_argument("--weak-first-draft", action="store_true",
                         help="force a generic first draft to demo the judge-and-revise loop")
     parser.add_argument("--resume", nargs=2, metavar=("THREAD_ID", "ACTION"),
-                        help="resume a paused run with approve, edit or reject")
+                        help="resume a paused run with approve, edit or reject; THREAD_ID can be 'last'")
     parser.add_argument("--body", help="replacement email body, used with edit")
+    parser.add_argument("--pending", action="store_true", help="list runs waiting for approval")
     parser.add_argument("--diagram", action="store_true", help="print the graph as Mermaid")
     args = parser.parse_args()
 
@@ -310,8 +333,15 @@ def main() -> None:
     with SqliteSaver.from_conn_string(str(CHECKPOINT_DB)) as checkpointer:
         app = build_graph(checkpointer)
 
-        if args.resume:
+        if args.pending:
+            list_pending(app, checkpointer)
+        elif args.resume:
             thread_id, action = args.resume
+            if thread_id == "last":
+                if not LAST_THREAD.exists():
+                    print("No paused run yet. Start one first, e.g. python graph_agent.py --case alex")
+                    return
+                thread_id = LAST_THREAD.read_text(encoding="utf-8").strip()
             if action not in ("approve", "edit", "reject"):
                 parser.error("ACTION must be approve, edit or reject")
             if action == "edit" and not args.body:
