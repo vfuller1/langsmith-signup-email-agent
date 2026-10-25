@@ -136,12 +136,14 @@ The signup is sent to the model as plain `key: value` text. There's no input mod
 
 ![Structured Output Schema](images/Structured%20Output%20Schema.png)
 
-| Tier | Criteria |
-|------|----------|
-| `high` | Engineering/product leader at a tech or SaaS company, 50+ employees |
-| `medium` | Developer or technical role at any company |
-| `low` | Non-technical role or company < 10 employees |
-| `unknown` | Insufficient information |
+| ICP fit | Rule | Example from the test cases | Typical treatment |
+|---------|------|-----------------------------|-------------------|
+| `high` | Engineering/product leader at a tech or SaaS company, 50+ employees | Victor, VP of Engineering, Acme Corp (500 people) | Personal sales outreach — a possible team account |
+| `medium` | Developer or technical role at any company | John, Developer; a Software Engineer at TechCorp | Self-serve onboarding for individual developers |
+| `low` | Non-technical role or company < 10 employees | Alex, Associate; Maya, CEO of an 8-person startup | Friendly automated welcome, no sales push |
+| `unknown` | Insufficient information | A signup with only an email address | Generic welcome, maybe ask for more details |
+
+Sales and marketing time is limited, so ICP fit decides who gets which treatment. In this project it also picks the email's **tone**: team productivity for high, developer speed for medium, warm and simple for low or unknown. In `graph_agent.py`, that's the `route_by_tone` decision that chooses `draft_high`, `draft_medium` or `draft_low`.
 
 ### 2. Email Generation
 Emails are generated with ICP-tier-specific value props:
