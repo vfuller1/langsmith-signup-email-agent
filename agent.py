@@ -4,6 +4,7 @@ Processes new user signups: classifies ICP fit and generates a personalized welc
 """
 
 import os
+import sys
 import json
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
@@ -13,6 +14,9 @@ from typing import Literal
 
 # ── Load keys from .env ───────────────────────────────────────────────────────
 load_dotenv()
+
+# Emoji in the eval output crash on Windows consoles that default to cp1252
+sys.stdout.reconfigure(encoding="utf-8")
 
 os.environ["LANGSMITH_TRACING"] = "true"
 os.environ["LANGSMITH_PROJECT"] = os.getenv(
@@ -120,8 +124,8 @@ if __name__ == "__main__":
     test_cases = [
         {
             "name": "Baseline - High ICP",
-            "input": """email: sarah@acmecorp.com
-first_name: Sarah
+            "input": """email: victor@acmecorp.com
+first_name: Victor
 company_name: Acme Corp
 role: VP of Engineering
 industry: SaaS
