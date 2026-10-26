@@ -91,6 +91,8 @@ langsmith-signup-email-agent/
 ├── graph_agent.py    # The same agent built with LangGraph: it can
 │                     # rewrite once and waits for a person to approve
 ├── eval.py           # Tests the agent with DeepEval
+├── graph_agent_tools.py  # Copy of graph_agent.py where the AI calls a
+│                     # pretend account-lookup tool first
 ├── graph_eval.py     # Tests graph_agent.py and saves the results
 │                     # in LangSmith
 ├── images/           # Pictures used in this README
@@ -398,6 +400,37 @@ python graph_agent.py --resume <thread_id> approve
 ```
 
 `--weak-first-draft` makes the first draft bland on purpose, so you can watch the judge fail it and the agent rewrite it. Without it, the prompt usually passes on the first try. Other options: `--case` (`victor`, `no-name`, `john`, `alex`, `maya`, `minimal`), `--signup "<your own details>"`, and `--diagram` to print the steps as a diagram.
+
+### Tool calling: looking up the account first
+
+`graph_agent_tools.py` is a copy of the graph with one extra step at the front. The AI **decides on its own** to call a tool, and LangGraph's `ToolNode` runs it:
+
+```
+START → lookup ⇄ tools → add_account_info → classify → draft → judge → human_approval → send
+```
+
+| Step | What it does |
+|------|--------------|
+| `lookup` | The AI reads the signup. It has one tool, `get_account_status(email)`, and decides to call it |
+| `tools` | A `ToolNode` runs the tool and gives the answer back to the AI |
+| `tools_condition` | Checks if the AI asked for a tool: yes → `tools`, no → move on |
+| `add_account_info` | Adds the AI's one-line summary (like "account: free trial, 9 days left") to the signup |
+| The rest | The same steps as `graph_agent.py`, unchanged |
+
+The tool is pretend. It stands in for a real sales or billing system and uses a small table of made-up accounts:
+
+| Email domain | Account | What the email says |
+|--------------|---------|---------------------|
+| `acmecorp.com` (Victor) | Active customer, Team plan, owner Dana | "Your team is already using Glop… reach out to Dana" |
+| `startupco.com` (Alex) | Free trial, 9 days left | "With 9 days left in your free trial…" |
+| `gmail.com` (John) and others | No account | Nothing about accounts |
+
+```powershell
+python graph_agent_tools.py --case victor
+python graph_agent_tools.py --resume last approve
+```
+
+To use a real system, replace the body of `get_account_status` with a real lookup. The graph doesn't change.
 
 ### Offline eval for the graph
 

@@ -24,3 +24,5 @@ Thumbs.db
 checkpoints.sqlite*
 outbox.jsonl
 last_thread.txt
+checkpoints_tools.sqlite*
+last_thread_tools.txt
