@@ -161,8 +161,9 @@ def stream(app, payload, config) -> None:
     if state.next:
         LAST_THREAD.write_text(thread_id, encoding="utf-8")
         print(f"\n⏸  Paused for human approval (thread_id: {thread_id})")
-        print("   Approve: python graph_agent_tools.py --resume last approve")
-        print("   Reject:  python graph_agent_tools.py --resume last reject")
+        print("   Copy one of these lines to finish it:\n")
+        print("python graph_agent_tools.py --resume last approve")
+        print("python graph_agent_tools.py --resume last reject")
     else:
         print(f"\n✔  Done (thread_id: {thread_id}, decision: {state.values.get('decision')})")
 

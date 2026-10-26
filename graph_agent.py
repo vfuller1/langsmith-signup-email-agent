@@ -279,10 +279,11 @@ def stream(app, payload, config) -> None:
     if state.next:
         LAST_THREAD.write_text(thread_id, encoding="utf-8")
         print(f"\n⏸  Paused for human approval (thread_id: {thread_id})")
-        print("   Approve: python graph_agent.py --resume last approve")
-        print("   Edit:    python graph_agent.py --resume last edit --body \"...\"")
-        print("   Reject:  python graph_agent.py --resume last reject")
-        print(f"   (\"last\" = {thread_id}; use the full id to pick an older run)")
+        print("   Copy one of these lines to finish it:\n")
+        print("python graph_agent.py --resume last approve")
+        print("python graph_agent.py --resume last reject")
+        print("python graph_agent.py --resume last edit --body \"New email text\"")
+        print(f"\n   (\"last\" = {thread_id}; use the full id to pick an older run)")
     else:
         print(f"\n✔  Done (thread_id: {thread_id}, decision: {state.values.get('decision')})")
 
