@@ -405,6 +405,8 @@ python graph_agent.py --resume <thread_id> approve
 
 `graph_agent_tools.py` is a copy of the graph with one extra step at the front. The AI **decides on its own** to call a tool, and LangGraph's `ToolNode` runs it:
 
+![LangGraph Tool Calling](images/LangGraph%20Tool%20Calling.png)
+
 ```
 START → lookup ⇄ tools → add_account_info → classify → draft → judge → human_approval → send
 ```
