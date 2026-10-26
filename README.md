@@ -487,6 +487,31 @@ If your team uses something else:
 
 ---
 
+## 🐞 A Real Problem the Tests Caught (Oct 24, 2026)
+
+**What happened.** In a normal `python agent.py` run, Alex's email started with "We're excited to have you on board at Glop!" and never said "Hi Alex". The judge gave it a 0, and the total dropped to 4/5. Nothing crashed; the AI just quietly did a worse job.
+
+**The cause.** One unclear line in the prompt. "Only if" sounded like a limit, not a rule. So on some runs the AI skipped the name, especially for low-fit signups, where the prompt also said "keep it warm and simple".
+
+| | The greeting line in `SYSTEM_PROMPT` (agent.py) |
+|---|---|
+| **Before** | `Opening: greet by first name only if provided; otherwise use a generic greeting` |
+| **After** | `Opening: if first_name is provided, ALWAYS start the body with "Hi <first_name>," — for every ICP tier; otherwise start with "Hi there,"` |
+
+**What the fix changed:**
+- **"ALWAYS"** makes it a rule, not a choice.
+- **"Hi <first_name>,"** gives the exact words.
+- **"for every ICP tier"** covers low-fit signups too.
+- **"Hi there,"** is the exact greeting when there's no name.
+
+**What didn't need fixing.** The judge was right, the sorting was right, and the code was fine. (The 0 in the LangGraph demo is different: it's forced on purpose with `--weak-first-draft`.)
+
+**How we proved it.** Three test signups (Alex, Maya, and one with no name) ran 8 times each. All 24 used the right greeting, and `python agent.py` went back to 5/5.
+
+**The lesson.** Vague prompt wording leads to answers that change from run to run. Say exactly what you want, then run the tests more than once to prove the fix holds.
+
+---
+
 ## 📏 Everything We Measure
 
 | What we measure | How | Tool | Result |
